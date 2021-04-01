@@ -45,6 +45,15 @@ class WorkerTmp(object):
         self.spinner = (self.spinner + 1) % 2
         os.fchmod(self._tmp.fileno(), self.spinner)
 
+    def write(self, data):
+        self._tmp.seek(0)
+        self._tmp.truncate(0)
+        os.write(self._tmp.fileno(), data)
+
+    def read(self):
+        self._tmp.seek(0)
+        return os.read(self._tmp.fileno(), 0x10000)
+
     def last_update(self):
         return os.fstat(self._tmp.fileno()).st_ctime
 

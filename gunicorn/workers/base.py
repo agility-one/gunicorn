@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import pickle
 import traceback
 from datetime import datetime
 from random import randint
@@ -50,6 +51,7 @@ class Worker(object):
         self.booted = False
         self.aborted = False
         self.reloader = None
+        self.stats = None
 
         self.nr = 0
 
@@ -72,7 +74,10 @@ class Worker(object):
         once every ``self.timeout`` seconds. If you fail in accomplishing
         this task, the master process will murder your workers.
         """
-        self.tmp.notify()
+        if self.stats:
+            self.tmp.write(pickle.dumps(self.stats))
+        else:
+            self.tmp.notify()
 
     def run(self):
         """\

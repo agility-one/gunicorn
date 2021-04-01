@@ -16,6 +16,7 @@ import gunicorn.http as http
 import gunicorn.http.wsgi as wsgi
 import gunicorn.util as util
 import gunicorn.workers.base as base
+from gunicorn.metrics.worker_stats import WorkerStats
 
 
 class StopWaiting(Exception):
@@ -23,12 +24,24 @@ class StopWaiting(Exception):
 
 
 class SyncWorker(base.Worker):
+    def __init__(self, *args, **kwargs):
+        super(SyncWorker, self).__init__(*args, **kwargs)
+        if self.cfg.prometheus_path:
+            self.stats = WorkerStats()
 
     def accept(self, listener):
         client, addr = listener.accept()
         client.setblocking(1)
         util.close_on_exec(client)
+
+        if self.stats:
+            self.stats.start_request()
+            self.notify()
+
         self.handle(listener, client, addr)
+
+        if self.stats:
+            self.stats.end_request()
 
     def wait(self, timeout):
         try:
