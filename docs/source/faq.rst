@@ -106,9 +106,9 @@ threads. However `a work has been started
 Why I don't see any logs in the console?
 ----------------------------------------
 
-In version R19, Gunicorn doesn't log by default in the console.
+In version 19.0, Gunicorn doesn't log by default in the console.
 To watch the logs in the console you need to use the option ``--log-file=-``.
-In version R20, Gunicorn logs to the console by default again.
+In version 19.2, Gunicorn logs to the console by default again.
 
 Kernel Parameters
 =================
@@ -172,10 +172,10 @@ disk-backed filesystem. For example, by default ``/tmp`` is not mounted as
 ``tmpfs`` in Ubuntu; in AWS an EBS root instance volume may sometimes hang for
 half a minute and during this time Gunicorn workers may completely block in
 ``os.fchmod``. ``os.fchmod`` may introduce extra delays if the disk gets full.
-Also Gunicon may refuse to start if it can't create the files when the disk is
+Also Gunicorn may refuse to start if it can't create the files when the disk is
 full.
 
-Currently to avoid these problems you can create a ``tmpfs`` mount (for a new
+Currently to avoid these problems you can use a ``tmpfs`` mount (for a new
 directory or for ``/tmp``) and pass its path to ``--worker-tmp-dir``. First,
 check whether your ``/tmp`` is disk-backed or RAM-backed::
 
@@ -183,7 +183,15 @@ check whether your ``/tmp`` is disk-backed or RAM-backed::
     Filesystem     1K-blocks    Used Available Use% Mounted on
     /dev/xvda1           ...     ...       ...  ... /
 
-No luck. Let's create a new ``tmpfs`` mount::
+No luck. If you are using Fedora or Ubuntu, you should already have a ``tmpfs``
+mount at ``/dev/shm``::
+
+    $ df /dev/shm
+    Filesystem     1K-blocks     Used Available Use% Mounted on
+    tmpfs                 ...     ...       ...  ... /dev/shm
+
+In this case you can set ``--worker-tmp-dir /dev/shm``, otherwise you can
+create a new ``tmpfs`` mount::
 
     sudo cp /etc/fstab /etc/fstab.orig
     sudo mkdir /mem
@@ -197,3 +205,30 @@ Check the result::
     tmpfs              65536     0     65536   0% /mem
 
 Now you can set ``--worker-tmp-dir /mem``.
+
+Why are Workers Silently Killed?
+--------------------------------------------------------------
+
+A sometimes subtle problem to debug is when a worker process is killed and there
+is little logging information about what happened.
+
+If you use a reverse proxy like NGINX you might see 502 returned to a client.
+
+In the gunicorn logs you might simply see ``[35] [INFO] Booting worker with pid: 35``
+
+It's completely normal for workers to be killed and startup, for example due to
+max-requests setting. Ordinarily gunicorn will capture any signals and log something.
+
+This particular failure case is usually due to a SIGKILL being received, as it's
+not possible to catch this signal silence is usually a common side effect! A common
+cause of SIGKILL is when OOM killer terminates a process due to low memory condition.
+
+This is increasingly common in container deployments where memory limits are enforced
+by cgroups, you'll usually see evidence of this from dmesg::
+
+    dmesg | grep gunicorn
+    Memory cgroup out of memory: Kill process 24534 (gunicorn) score 1506 or sacrifice child
+    Killed process 24534 (gunicorn) total-vm:1016648kB, anon-rss:550160kB, file-rss:25824kB, shmem-rss:0kB
+
+In these instances adjusting the memory limit is usually your best bet, it's also possible
+to configure OOM not to send SIGKILL by default.

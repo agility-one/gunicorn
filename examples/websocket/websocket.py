@@ -11,12 +11,12 @@ import logging
 from socket import error as SocketError
 
 import eventlet
-from gunicorn.workers.async import ALREADY_HANDLED
+from gunicorn.workers.base_async import ALREADY_HANDLED
 from eventlet import pools
 
 logger = logging.getLogger(__name__)
 
-WS_KEY = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+WS_KEY = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 class WebSocketWSGI(object):
     def __init__(self, handler):
@@ -81,6 +81,10 @@ class WebSocketWSGI(object):
             if ws_extensions:
                 handshake_reply += 'Sec-WebSocket-Extensions: %s\r\n' % ', '.join(ws_extensions)
 
+            key_hash = sha1()
+            key_hash.update(key.encode())
+            key_hash.update(WS_KEY)
+
             handshake_reply +=  (
                 "Sec-WebSocket-Origin: %s\r\n"
                 "Sec-WebSocket-Location: ws://%s%s\r\n"
@@ -91,7 +95,7 @@ class WebSocketWSGI(object):
                     environ.get('HTTP_HOST'),
                     ws.path,
                     version,
-                    base64.b64encode(sha1(key + WS_KEY).digest())
+                    base64.b64encode(key_hash.digest()).decode()
                 ))
 
         else:
@@ -103,13 +107,14 @@ class WebSocketWSGI(object):
                             environ.get('HTTP_HOST'),
                             ws.path))
 
-        sock.sendall(handshake_reply)
+        sock.sendall(handshake_reply.encode())
 
         try:
             self.handler(ws)
-        except socket.error as e:
-            if e[0] != errno.EPIPE:
-                raise
+        except BrokenPipeError:
+            pass
+        else:
+            raise
         # use this undocumented feature of grainbows to ensure that it
         # doesn't barf on the fact that we didn't call start_response
         return ALREADY_HANDLED
@@ -164,6 +169,8 @@ class WebSocket(object):
         """
         if base64:
             buf = b64encode(buf)
+        else:
+            buf = buf.encode()
 
         b1 = 0x80 | (opcode & 0x0f) # FIN + opcode
         payload_len = len(buf)
@@ -244,7 +251,7 @@ class WebSocket(object):
                 data = struct.unpack('<I', buf[f['hlen']:f['hlen']+4])[0]
                 of1 = f['hlen']+4
                 b = ''
-                for i in xrange(0, int(f['length']/4)):
+                for i in range(0, int(f['length']/4)):
                     mask = struct.unpack('<I', buf[of1+4*i:of1+4*(i+1)])[0]
                     b += struct.pack('I', data ^ mask)
 
@@ -286,10 +293,8 @@ class WebSocket(object):
 
         As per the dataframing section (5.3) for the websocket spec
         """
-        if isinstance(message, unicode):
+        if isinstance(message, str):
             message = message.encode('utf-8')
-        elif not isinstance(message, str):
-            message = str(message)
         packed = "\x00%s\xFF" % message
         return packed
 
@@ -347,7 +352,7 @@ class WebSocket(object):
     def send(self, message):
         """Send a message to the browser.
 
-        *message* should be convertable to a string; unicode objects should be
+        *message* should be convertible to a string; unicode objects should be
         encodable as utf-8.  Raises socket.error with errno of 32
         (broken pipe) if the socket has already been closed by the client."""
         if self.version in ['7', '8', '13']:
@@ -376,7 +381,7 @@ class WebSocket(object):
                 return None
             # no parsed messages, must mean buf needs more data
             delta = self.socket.recv(8096)
-            if delta == '':
+            if delta == b'':
                 return None
             self._buf += delta
             msgs = self._parse_messages()
@@ -396,7 +401,7 @@ class WebSocket(object):
 
         elif self.version == 76 and not self.websocket_closed:
             try:
-                self.socket.sendall("\xff\x00")
+                self.socket.sendall(b"\xff\x00")
             except SocketError:
                 # Sometimes, like when the remote side cuts off the connection,
                 # we don't care about this.
@@ -425,7 +430,7 @@ def handle(ws):
             ws.send(m)
 
     elif ws.path == '/data':
-        for i in xrange(10000):
+        for i in range(10000):
             ws.send("0 %s %s\n" % (i, random.random()))
             eventlet.sleep(0.1)
 
@@ -439,7 +444,7 @@ def app(environ, start_response):
                      'websocket.html')).read()
         data = data % environ
         start_response('200 OK', [('Content-Type', 'text/html'),
-                                 ('Content-Length', len(data))])
-        return [data]
+                                 ('Content-Length', str(len(data)))])
+        return [data.encode()]
     else:
         return wsapp(environ, start_response)

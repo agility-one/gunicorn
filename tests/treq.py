@@ -4,14 +4,14 @@
 # under the MIT license.
 
 import inspect
+import importlib.machinery
 import os
 import random
+import types
 
-from gunicorn._compat import execfile_
 from gunicorn.config import Config
 from gunicorn.http.parser import RequestParser
 from gunicorn.util import split_request_uri
-from gunicorn import six
 
 dirname = os.path.dirname(__file__)
 random.seed()
@@ -30,11 +30,13 @@ def uri(data):
 
 
 def load_py(fname):
-    config = globals().copy()
-    config["uri"] = uri
-    config["cfg"] = Config()
-    execfile_(fname, config)
-    return config
+    module_name = '__config__'
+    mod = types.ModuleType(module_name)
+    setattr(mod, 'uri', uri)
+    setattr(mod, 'cfg', Config())
+    loader = importlib.machinery.SourceFileLoader(module_name, fname)
+    loader.exec_module(mod)
+    return vars(mod)
 
 
 class request(object):
@@ -71,10 +73,7 @@ class request(object):
 
     def send_bytes(self):
         for d in self.data:
-            if six.PY3:
-                yield bytes([d])
-            else:
-                yield d
+            yield bytes([d])
 
     def send_random(self):
         maxs = round(len(self.data) / 10)
@@ -125,7 +124,7 @@ class request(object):
     def szread(self, func, sizes):
         sz = sizes()
         data = func(sz)
-        if sz >= 0 and len(data) > sz:
+        if 0 <= sz < len(data):
             raise AssertionError("Read more than %d bytes: %s" % (sz, data))
         return data
 
@@ -205,7 +204,7 @@ class request(object):
         if body:
             raise AssertionError("Failed to read entire body: %r" % body)
         try:
-            data = six.next(iter(req.body))
+            data = next(iter(req.body))
             raise AssertionError("Read data after body finished: %r" % data)
         except StopIteration:
             pass
@@ -246,7 +245,7 @@ class request(object):
 
     def check(self, cfg, sender, sizer, matcher):
         cases = self.expect[:]
-        p = RequestParser(cfg, sender())
+        p = RequestParser(cfg, sender(), None)
         for req in p:
             self.same(req, sizer, matcher, cases.pop(0))
         assert not cases
@@ -283,5 +282,5 @@ class badrequest(object):
             read += chunk
 
     def check(self, cfg):
-        p = RequestParser(cfg, self.send())
-        six.next(p)
+        p = RequestParser(cfg, self.send(), None)
+        next(p)

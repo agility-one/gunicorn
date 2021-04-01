@@ -6,9 +6,6 @@ ignore=
     examples,
     scripts,
     _compat.py,
-    argparse_compat.py,
-    six.py,
-    selectors.py,
     _gaiohttp.py,
 
 [MESSAGES CONTROL]
@@ -24,6 +21,7 @@ disable=
     eval-used,
     fixme,
     import-error,
+    import-outside-toplevel,
     import-self,
     inconsistent-return-statements,
     invalid-name,
@@ -36,6 +34,7 @@ disable=
     no-staticmethod-decorator,
     not-callable,
     protected-access,
+    raise-missing-from,
     redefined-outer-name,
     too-few-public-methods,
     too-many-arguments,
@@ -50,3 +49,7 @@ disable=
     wrong-import-order,
     ungrouped-imports,
     unused-argument,
+    useless-object-inheritance,
+    useless-import-alias,
+    comparison-with-callable,
+    try-except-raise,

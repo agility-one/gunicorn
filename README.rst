@@ -23,12 +23,12 @@ Feel free to join us in `#gunicorn`_ on Freenode_.
 Documentation
 -------------
 
-The documentation is hosted at http://docs.gunicorn.org.
+The documentation is hosted at https://docs.gunicorn.org.
 
 Installation
 ------------
 
-Gunicorn requires **Python 2.x >= 2.6** or **Python 3.x >= 3.2**.
+Gunicorn requires **Python 3.x >= 3.5**.
 
 Install from PyPI::
 
@@ -50,6 +50,12 @@ Example with test app::
 
     $ cd examples
     $ gunicorn --workers=2 test:app
+
+
+Contributing
+------------
+
+See `our complete contributor's guide <CONTRIBUTING.md>`_ for more details.
 
 
 License

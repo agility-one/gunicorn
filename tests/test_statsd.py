@@ -1,15 +1,14 @@
-from datetime import timedelta
-import socket
+import io
 import logging
-import tempfile
-import shutil
 import os
+import shutil
+import socket
+import tempfile
+from datetime import timedelta
+from types import SimpleNamespace
 
 from gunicorn.config import Config
 from gunicorn.instrument.statsd import Statsd
-from gunicorn.six import StringIO
-
-from support import SimpleNamespace
 
 
 class StatsdTestException(Exception):
@@ -60,10 +59,21 @@ def test_statsd_fail():
     logger.exception("No impact on logging")
 
 
+def test_dogstatsd_tags():
+    c = Config()
+    tags = 'yucatan,libertine:rhubarb'
+    c.set('dogstatsd_tags', tags)
+    logger = Statsd(c)
+    logger.sock = MockSocket(False)
+    logger.info("Twill", extra={"mtype": "gauge", "metric": "barb.westerly",
+                                "value": 2})
+    assert logger.sock.msgs[0] == b"barb.westerly:2|g|#" + tags.encode('ascii')
+
+
 def test_instrument():
     logger = Statsd(Config())
     # Capture logged messages
-    sio = StringIO()
+    sio = io.StringIO()
     logger.error_log.addHandler(logging.StreamHandler(sio))
     logger.sock = MockSocket(False)
 

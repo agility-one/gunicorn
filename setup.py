@@ -13,22 +13,22 @@ from gunicorn import __version__
 
 
 CLASSIFIERS = [
-    'Development Status :: 4 - Beta',
+    'Development Status :: 5 - Production/Stable',
     'Environment :: Other Environment',
     'Intended Audience :: Developers',
     'License :: OSI Approved :: MIT License',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX',
     'Programming Language :: Python',
-    'Programming Language :: Python :: 2',
-    'Programming Language :: Python :: 2.6',
-    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.2',
-    'Programming Language :: Python :: 3.3',
-    'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
     'Topic :: Internet',
     'Topic :: Utilities',
     'Topic :: Software Development :: Libraries :: Python Modules',
@@ -45,11 +45,6 @@ with open(os.path.join(os.path.dirname(__file__), 'README.rst')) as f:
 fname = os.path.join(os.path.dirname(__file__), 'requirements_test.txt')
 with open(fname) as f:
     tests_require = [l.strip() for l in f.readlines()]
-
-if sys.version_info[:2] < (3, 3):
-    tests_require.append('mock')
-if sys.version_info[:2] < (2, 7):
-    tests_require.append('unittest2')
 
 class PyTestCommand(TestCommand):
     user_options = [
@@ -73,14 +68,21 @@ class PyTestCommand(TestCommand):
         sys.exit(errno)
 
 
-extra_require = {
-    'gevent':  ['gevent>=0.13'],
-    'eventlet': ['eventlet>=0.9.7'],
+install_requires = [
+    # We depend on functioning pkg_resources.working_set.add_entry() and
+    # pkg_resources.load_entry_point(). These both work as of 3.0 which
+    # is the first version to support Python 3.4 which we require as a
+    # floor.
+    'setuptools>=3.0',
+]
+
+extras_require = {
+    'gevent':  ['gevent>=1.4.0'],
+    'eventlet': ['eventlet>=0.24.1'],
     'tornado': ['tornado>=0.2'],
     'gthread': [],
+    'setproctitle': ['setproctitle'],
 }
-if sys.version_info[0] < 3:
-    extra_require['gthread'] = ['futures']
 
 setup(
     name='gunicorn',
@@ -91,9 +93,16 @@ setup(
     author='Benoit Chesneau',
     author_email='benoitc@e-engura.com',
     license='MIT',
-    url='http://gunicorn.org',
+    url='https://gunicorn.org',
+    project_urls={
+        'Documentation': 'https://docs.gunicorn.org',
+        'Homepage': 'https://gunicorn.org',
+        'Issue tracker': 'https://github.com/benoitc/gunicorn/issues',
+        'Source code': 'https://github.com/benoitc/gunicorn',
+    },
 
-    python_requires='>=2.6, !=3.0.*, !=3.1.*',
+    python_requires='>=3.5',
+    install_requires=install_requires,
     classifiers=CLASSIFIERS,
     zip_safe=False,
     packages=find_packages(exclude=['examples', 'tests']),
@@ -105,10 +114,9 @@ setup(
     entry_points="""
     [console_scripts]
     gunicorn=gunicorn.app.wsgiapp:run
-    gunicorn_paster=gunicorn.app.pasterapp:run
 
     [paste.server_runner]
-    main=gunicorn.app.pasterapp:paste_server
+    main=gunicorn.app.pasterapp:serve
     """,
-    extras_require=extra_require,
+    extras_require=extras_require,
 )

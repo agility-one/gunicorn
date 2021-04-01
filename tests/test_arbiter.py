@@ -4,14 +4,11 @@
 # See the NOTICE for more information.
 
 import os
-
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock
+import unittest.mock as mock
 
 import gunicorn.app.base
 import gunicorn.arbiter
+from gunicorn.config import ReusePort
 
 
 class DummyApplication(gunicorn.app.base.BaseApplication):
@@ -60,6 +57,15 @@ def test_arbiter_stop_parent_does_not_unlink_listeners(close_sockets):
 def test_arbiter_stop_does_not_unlink_systemd_listeners(close_sockets):
     arbiter = gunicorn.arbiter.Arbiter(DummyApplication())
     arbiter.systemd = True
+    arbiter.stop()
+    close_sockets.assert_called_with([], False)
+
+
+@mock.patch('gunicorn.sock.close_sockets')
+def test_arbiter_stop_does_not_unlink_when_using_reuse_port(close_sockets):
+    arbiter = gunicorn.arbiter.Arbiter(DummyApplication())
+    arbiter.cfg.settings['reuse_port'] = ReusePort()
+    arbiter.cfg.settings['reuse_port'].set(True)
     arbiter.stop()
     close_sockets.assert_called_with([], False)
 
@@ -163,7 +169,7 @@ class PreloadedAppWithEnvSettings(DummyApplication):
         'preloaded' application.
         """
         verify_env_vars()
-        return super(PreloadedAppWithEnvSettings, self).wsgi()
+        return super().wsgi()
 
 
 def verify_env_vars():

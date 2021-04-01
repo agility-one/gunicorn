@@ -2,8 +2,6 @@ import time
 import pickle
 from collections import namedtuple
 
-from gunicorn import six
-
 
 class MetricsStore(object):
     Item = namedtuple('Item', ['metric_name', 'metric_type', 'tags', 'value'])
@@ -23,7 +21,7 @@ class MetricsStore(object):
         self.data = {}
 
     def add(self, metric_name, metric_type, value, **tags):
-        tags_hash = hash(frozenset(six.iteritems(tags)))
+        tags_hash = hash(frozenset(tags.items()))
         self.data[metric_name, tags_hash] = (metric_type, value, tags)
 
     def add_worker(self, worker):
@@ -47,12 +45,12 @@ class MetricsStore(object):
         self.add('idle_time_seconds_sum', 'summary', idle_time_sum, pid=worker.pid)
 
     def __iter__(self):
-        for (metric_name, _), (metric_type, value, tags) in six.iteritems(self.data):
+        for (metric_name, _), (metric_type, value, tags) in self.data.items():
             yield self.Item(metric_name, metric_type, tags, value)
 
     def prometheus_iter(self):
         for item in self:
-            tags_str = ','.join('{}="{}"'.format(*kv) for kv in six.iteritems(item.tags))
+            tags_str = ','.join('{}="{}"'.format(*kv) for kv in item.tags.items())
             if tags_str:
                 tags_str = '{%s}' % tags_str
 
